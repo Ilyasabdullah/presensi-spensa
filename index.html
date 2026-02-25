@@ -10,21 +10,30 @@
     body { background-color: #0f141e; color: #ffffff; font-family: sans-serif; margin: 0; padding: 20px; text-align: center; }
     h1 { color: #2ecc71; margin-bottom: 5px; font-size: 24px; }
     .subtitle { color: #8b9bb4; font-size: 14px; margin-bottom: 25px; }
-    #reader-container { background-color: #000000; border-radius: 12px; padding: 5px; margin: 0 auto; max-width: 400px; }
+    #reader-container { background-color: #000000; border-radius: 12px; padding: 5px; margin: 0 auto; max-width: 400px; position: relative; }
     #reader { width: 100%; border-radius: 8px; overflow: hidden; border: 2px solid #2ecc71; }
     #error-box { background-color: #1e2532; color: #ff6b6b; padding: 15px; border-radius: 8px; margin: 20px auto; max-width: 400px; display: none; font-size: 14px; border: 1px solid #3a4556; }
     #success-box { background-color: #d4edda; color: #155724; padding: 15px; border-radius: 8px; margin: 20px auto; max-width: 400px; display: none; font-weight: bold; }
+    
+    /* Tombol Ganti Kamera */
+    .btn-kamera { background-color: #2980b9; color: white; border: none; padding: 10px 20px; font-size: 14px; border-radius: 6px; cursor: pointer; margin-top: 15px; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: 0.2s; }
+    .btn-kamera:active { background-color: #1f6391; transform: translateY(2px); }
+    
     .footer-status { color: #5c6b82; font-size: 12px; margin-top: 20px; line-height: 1.8; }
   </style>
 </head>
 <body>
   <h1>SCANNER PRESENSI</h1>
   <p class="subtitle">Mode Pos Satpam / Gerbang</p>
+  
   <div id="reader-container"><div id="reader"></div></div>
+  
+  <button class="btn-kamera" onclick="gantiKamera()">🔄 Ganti Kamera</button>
+
   <div id="error-box"></div>
   <div id="success-box"></div>
   <div class="footer-status">
-    <span id="cam-status">Kamera: Belakang</span><br>
+    <span id="cam-status">Kamera: Menyiapkan...</span><br>
     <span id="db-status">Menunggu Scan...</span><br>
     <span id="gps-status">GPS: Memeriksa Lokasi...</span>
   </div>
@@ -37,8 +46,14 @@
     const successBox = document.getElementById('success-box');
     const dbStatus = document.getElementById('db-status');
     const gpsStatus = document.getElementById('gps-status');
+    const camStatus = document.getElementById('cam-status');
+    
     let html5QrcodeScanner;
     let userLat = ""; let userLng = "";
+    
+    // Variabel untuk melacak kamera mana yang sedang dipakai (environment = belakang, user = depan)
+    let modeKamera = "environment"; 
+    let isScanning = false;
 
     function getLocation() {
       if (navigator.geolocation) {
@@ -51,51 +66,65 @@
     }
 
     function onScanSuccess(decodedText) {
-  html5QrcodeScanner.pause();
-  successBox.style.display = 'block';
-  successBox.innerHTML = "Mengirim Data: " + decodedText;
-  
-  // Menggunakan URLSearchParams agar data terkirim sebagai parameter formal
-  const params = new URLSearchParams();
-  params.append("id", decodedText);
-  params.append("lat", userLat);
-  params.append("lng", userLng);
+      if(isScanning) {
+        html5QrcodeScanner.pause();
+        successBox.style.display = 'block';
+        successBox.innerHTML = "Mengirim Data: " + decodedText;
+        dbStatus.innerText = "Memproses...";
+        
+        const params = new URLSearchParams();
+        params.append("id", decodedText);
+        params.append("lat", userLat);
+        params.append("lng", userLng);
 
-  fetch(scriptURL, {
-    method: "POST",
-    body: params,
-    mode: "no-cors", // Mode ini paling aman untuk menghindari CORS error di Apps Script
-  })
-  .then(() => {
-    // Karena mode no-cors tidak bisa membaca jawaban teks, kita asumsikan sukses jika tidak ada error network
-    successBox.innerHTML = "✅ Data Berhasil Dikirim ke Server";
-    setTimeout(() => { 
-      successBox.style.display = 'none'; 
-      html5QrcodeScanner.resume(); 
-    }, 2500);
-  })
-  .catch(err => {
-    errorBox.style.display = 'block';
-    errorBox.innerHTML = "Gagal Kirim: " + err;
-    setTimeout(() => { 
-      errorBox.style.display = 'none'; 
-      html5QrcodeScanner.resume(); 
-    }, 3000);
-  });
-}
+        fetch(scriptURL, { method: "POST", body: params, mode: "no-cors" })
+        .then(() => {
+          successBox.innerHTML = "✅ Presensi Berhasil Dicatat";
+          dbStatus.innerText = "Menunggu Scan...";
+          setTimeout(() => { successBox.style.display = 'none'; html5QrcodeScanner.resume(); }, 2500);
+        })
+        .catch(err => {
+          errorBox.style.display = 'block';
+          errorBox.innerHTML = "Gagal Kirim: " + err;
+          setTimeout(() => { errorBox.style.display = 'none'; html5QrcodeScanner.resume(); }, 3000);
+        });
+      }
+    }
+
+    function mulaiKamera() {
+      html5QrcodeScanner.start(
+        { facingMode: modeKamera }, 
+        { fps: 10, qrbox: 250 }, 
+        onScanSuccess
+      ).then(() => {
+        isScanning = true;
+        camStatus.innerText = "Kamera: " + (modeKamera === "environment" ? "Belakang" : "Depan");
+      }).catch(err => {
+        errorBox.style.display = 'block';
+        errorBox.innerHTML = "Error Kamera: " + err;
+      });
+    }
+
+    function gantiKamera() {
+      if (isScanning) {
+        html5QrcodeScanner.stop().then(() => {
+          isScanning = false;
+          // Tukar mode kamera
+          modeKamera = (modeKamera === "environment") ? "user" : "environment";
+          // Mulai lagi dengan kamera yang baru
+          mulaiKamera();
+        }).catch(err => {
+          errorBox.style.display = 'block';
+          errorBox.innerHTML = "Gagal menukar kamera: " + err;
+        });
+      }
+    }
 
     window.onload = function() {
       getLocation();
       html5QrcodeScanner = new Html5Qrcode("reader");
-      html5QrcodeScanner.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, onScanSuccess)
-      .catch(err => {
-        errorBox.style.display = 'block';
-        errorBox.innerHTML = "Error Kamera: " + err;
-      });
+      mulaiKamera();
     };
   </script>
 </body>
 </html>
-
-
-
