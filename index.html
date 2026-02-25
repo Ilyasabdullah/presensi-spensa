@@ -51,28 +51,38 @@
     }
 
     function onScanSuccess(decodedText) {
-      html5QrcodeScanner.pause();
-      successBox.style.display = 'block';
-      successBox.innerHTML = "Mengirim Data: " + decodedText;
-      
-      // Kirim ke Google Apps Script menggunakan fetch (POST)
-      const formData = new FormData();
-      formData.append("id", decodedText);
-      formData.append("lat", userLat);
-      formData.append("lng", userLng);
+  html5QrcodeScanner.pause();
+  successBox.style.display = 'block';
+  successBox.innerHTML = "Mengirim Data: " + decodedText;
+  
+  // Menggunakan URLSearchParams agar data terkirim sebagai parameter formal
+  const params = new URLSearchParams();
+  params.append("id", decodedText);
+  params.append("lat", userLat);
+  params.append("lng", userLng);
 
-      fetch(scriptURL, { method: "POST", body: formData })
-      .then(res => res.text())
-      .then(response => {
-        successBox.innerHTML = "✅ " + response;
-        setTimeout(() => { successBox.style.display = 'none'; html5QrcodeScanner.resume(); }, 2500);
-      })
-      .catch(err => {
-        errorBox.style.display = 'block';
-        errorBox.innerHTML = "Gagal Kirim ke Server. Cek Koneksi.";
-        setTimeout(() => { errorBox.style.display = 'none'; html5QrcodeScanner.resume(); }, 3000);
-      });
-    }
+  fetch(scriptURL, {
+    method: "POST",
+    body: params,
+    mode: "no-cors", // Mode ini paling aman untuk menghindari CORS error di Apps Script
+  })
+  .then(() => {
+    // Karena mode no-cors tidak bisa membaca jawaban teks, kita asumsikan sukses jika tidak ada error network
+    successBox.innerHTML = "✅ Data Berhasil Dikirim ke Server";
+    setTimeout(() => { 
+      successBox.style.display = 'none'; 
+      html5QrcodeScanner.resume(); 
+    }, 2500);
+  })
+  .catch(err => {
+    errorBox.style.display = 'block';
+    errorBox.innerHTML = "Gagal Kirim: " + err;
+    setTimeout(() => { 
+      errorBox.style.display = 'none'; 
+      html5QrcodeScanner.resume(); 
+    }, 3000);
+  });
+}
 
     window.onload = function() {
       getLocation();
@@ -86,3 +96,4 @@
   </script>
 </body>
 </html>
+
