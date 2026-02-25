@@ -42,7 +42,10 @@
 
   <script>
     // MASUKKAN URL GOOGLE SCRIPT (/exec) ANDA DI SINI
-    const scriptURL = "https://script.google.com/macros/s/AKfycbzfo33r7wnYx5qosu2nnprRtlrZdbnzKh8R421p2zaMvbPCbYI5Bu92Xo4pv56mthxPNg/exec"; 
+    const scriptURL = "URL_WEB_APP_GOOGLE_ANDA"; 
+
+    // === TAMBAHAN AUDIO BEEP ===
+    const beepSound = new Audio("https://cdn.pixabay.com/download/audio/2021/08/04/audio_0625c1539c.mp3");
 
     const errorBox = document.getElementById('error-box');
     const successBox = document.getElementById('success-box');
@@ -53,7 +56,6 @@
     let html5QrcodeScanner;
     let userLat = ""; let userLng = "";
     
-    // Variabel untuk melacak kamera mana yang sedang dipakai (environment = belakang, user = depan)
     let modeKamera = "environment"; 
     let isScanning = false;
 
@@ -69,6 +71,10 @@
 
     function onScanSuccess(decodedText) {
       if(isScanning) {
+        // === MAINKAN SUARA BEEP DI SINI ===
+        // Menggunakan .catch untuk mencegah error jika browser memblokir auto-play
+        beepSound.play().catch(err => console.log("Suara diblokir sementara oleh browser: ", err));
+
         html5QrcodeScanner.pause();
         successBox.style.display = 'block';
         successBox.innerHTML = "Mengirim Data: " + decodedText;
@@ -111,9 +117,7 @@
       if (isScanning) {
         html5QrcodeScanner.stop().then(() => {
           isScanning = false;
-          // Tukar mode kamera
           modeKamera = (modeKamera === "environment") ? "user" : "environment";
-          // Mulai lagi dengan kamera yang baru
           mulaiKamera();
         }).catch(err => {
           errorBox.style.display = 'block';
@@ -130,6 +134,7 @@
   </script>
 </body>
 </html>
+
 
 
 
