@@ -4,7 +4,7 @@
   <base target="_top">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Presensi Spensa</title>
+  <title>Kiosk Presensi (Guru & Siswa)</title>
   
   <link rel="icon" type="image/png" href="https://img.icons8.com/fluency/512/qr-code.png">
   <script src="https://unpkg.com/html5-qrcode"></script>
@@ -63,8 +63,8 @@
   </style>
 </head>
 <body>
-  <h1>PRESENSI PINTAR</h1>
-  <p class="subtitle">SMP NEGERI 1 MABA</p>
+  <h1>SCAN PRESENSI</h1>
+  <p class="subtitle">SMP NEGERI 1 INDONESIA</p>
 
   <div id="offline-badge">Koneksi Terputus - Mode Offline</div>
   <button id="sync-btn" onclick="syncData()">🔄 Sinkronisasi Data Tertunda (<span id="queue-count">0</span>)</button>
@@ -178,9 +178,6 @@
       }
     }
 
-    // ==========================================
-    // FUNGSI ANIMASI YANG DIPERCEPAT (CUMA 1 DETIK)
-    // ==========================================
     function tampilkanSuksesLayarPenuh(judul, pesanHTML) {
         const alertBox = document.getElementById('fullscreen-alert');
         alertBox.className = "bg-green";
@@ -190,11 +187,10 @@
         document.getElementById('alert-title').innerHTML = judul;
         document.getElementById('alert-desc').innerHTML = pesanHTML;
         
-        // HANYA TAMPIL 1 DETIK LALU LANGSUNG BUKA KAMERA LAGI
         setTimeout(() => {
             alertBox.style.display = "none";
             isScanning = false; 
-        }, 1000); 
+        }, 2500); 
     }
 
     function tampilkanErrorLayarPenuh(pesanHTML) {
@@ -206,11 +202,10 @@
         document.getElementById('alert-title').innerHTML = "PERHATIAN!";
         document.getElementById('alert-desc').innerHTML = pesanHTML;
         
-        // HANYA TAMPIL 1,5 DETIK UNTUK ERROR
         setTimeout(() => {
             alertBox.style.display = "none";
             isScanning = false;
-        }, 1500); 
+        }, 3500); 
     }
 
     function tampilkanLoadingLayarPenuh(keteranganTarget) {
@@ -242,19 +237,16 @@
         }
         if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
         
-        // HAPUS ATAU BERI KOMENTAR PADA BAGIAN INI AGAR HP TIDAK NGE-LAG:
-        /*
         const readerEl = document.getElementById('reader');
         if(readerEl) {
             readerEl.style.transition = "all 0.1s ease-in-out";
-            readerEl.style.border = "12px solid #2ecc71";
-            readerEl.style.boxShadow = "0px 0px 40px rgba(46, 204, 113, 0.9)";
+            readerEl.style.border = "12px solid #3498db";
+            readerEl.style.boxShadow = "0px 0px 40px rgba(52, 152, 219, 0.9)";
             setTimeout(() => { 
-                readerEl.style.border = "2px solid #2ecc71"; 
+                readerEl.style.border = "2px solid #3498db"; 
                 readerEl.style.boxShadow = "none";
             }, 500);
         }
-        */
     }
 
     // ==========================================
@@ -348,35 +340,48 @@
       updateQueueUI();
     }
 
-    // ==========================================
-    // FUNGSI KIRIM SERVER YANG 100% AMAN (MENUNGGU BALASAN)
-    // ==========================================
     function kirimKeServer(dataScan) {
-      tampilkanLoadingLayarPenuh(); // Wajib ada untuk menahan siswa agar tidak langsung pergi
-      
-      const params = new URLSearchParams();
-      params.append("id", dataScan.id);
-      params.append("lat", dataScan.lat);
-      params.append("lng", dataScan.lng);
-      params.append("waktu_scan", dataScan.waktu_scan);
+        tampilkanLoadingLayarPenuh(dataScan.tipe_target);
+        
+        const params = new URLSearchParams();
+        params.append("id", dataScan.id);
+        params.append("lat", dataScan.lat);
+        params.append("lng", dataScan.lng);
+        params.append("waktu_scan", dataScan.waktu_scan);
 
-      fetch(urlServer, { method: "POST", body: params })
-      .then(res => res.text())
-      .then(pesanFinal => {
-          // Hanya tampilkan hijau jika Google benar-benar menjawab SUKSES
-          if (pesanFinal.includes("Berhasil") || pesanFinal.includes("Hadir") || pesanFinal.includes("Tepat") || pesanFinal.includes("Pulang") || pesanFinal.includes("Cepat") || pesanFinal.includes("Terlambat")) {
-             tampilkanSuksesLayarPenuh("BERHASIL!", pesanFinal);
-          } else {
-             tampilkanErrorLayarPenuh(pesanFinal);
-             delete recentScans[dataScan.id]; // Hapus masa tunggu jika gagal
-             localStorage.setItem('recentScansKiosk', JSON.stringify(recentScans));
-          }
-      })
-      .catch(err => {
-          // Jika di tengah proses loading tiba-tiba sinyal putus, amankan ke antrean offline
-          simpanKeAntrean(dataScan);
-          tampilkanSuksesLayarPenuh("TERSIMPAN OFFLINE", "Internet terputus saat memproses.<br>Data berhasil diamankan di HP.");
-      });
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+        fetch(dataScan.target_url, { method: "POST", body: params, signal: controller.signal })
+        .then(res => res.text())
+        .then(pesanFinal => {
+            clearTimeout(timeoutId); 
+            if (pesanFinal.includes("Berhasil") || pesanFinal.includes("Hadir") || pesanFinal.includes("Tepat") || pesanFinal.includes("Pulang") || pesanFinal.includes("Cepat") || pesanFinal.includes("Terlambat")) {
+               tampilkanSuksesLayarPenuh(`BERHASIL (${dataScan.tipe_target})`, pesanFinal);
+            } else {
+               tampilkanErrorLayarPenuh(pesanFinal);
+               delete recentScans[dataScan.id]; 
+               localStorage.setItem('recentScansKiosk', JSON.stringify(recentScans));
+            }
+        })
+        .catch(err => {
+            clearTimeout(timeoutId);
+            simpanKeAntrean(dataScan);
+            if (err.name === 'AbortError') {
+                tampilkanSuksesLayarPenuh("TERSIMPAN OFFLINE", "Server terlalu lama merespon.<br>Data diamankan di antrean HP.");
+            } else {
+                tampilkanSuksesLayarPenuh("TERSIMPAN OFFLINE", "Internet terputus saat memproses.<br>Data diamankan di antrean HP.");
+            }
+        })
+        .finally(() => {
+            setTimeout(() => { 
+                isScanning = false; 
+                const alertBox = document.getElementById('fullscreen-alert');
+                if(alertBox.style.display === "flex" && alertBox.className === "bg-blue") {
+                    alertBox.style.display = "none";
+                }
+            }, 3000);
+        });
     }
 
     // ==========================================
