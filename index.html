@@ -306,9 +306,10 @@
     }
 
     // ==========================================
-    // FUNGSI KIRIM SERVER YANG 100% AMAN & CEPAT
+    // FUNGSI KIRIM SERVER (100% AMAN - WAJIB NUNGGU SERVER)
     // ==========================================
     function kirimKeServer(dataScan) {
+      // 1. Munculkan Layar Biru untuk menahan siswa agar tidak pergi dulu
       tampilkanLoadingLayarPenuh(); 
       
       const params = new URLSearchParams();
@@ -317,10 +318,11 @@
       params.append("lng", dataScan.lng);
       params.append("waktu_scan", dataScan.waktu_scan);
 
-      // LANGSUNG TEMBAK 1 URL TANPA RAGU
+      // 2. KETUK SERVER DAN TUNGGU JAWABANNYA
       fetch(urlServer, { method: "POST", body: params })
       .then(res => res.text())
       .then(pesanFinal => {
+          // 3. Hanya tampilkan layar Hijau JIKA Google benar-benar berhasil menulis di Spreadsheet
           if (pesanFinal.includes("Berhasil") || pesanFinal.includes("Hadir") || pesanFinal.includes("Tepat") || pesanFinal.includes("Pulang") || pesanFinal.includes("Cepat") || pesanFinal.includes("Terlambat")) {
              tampilkanSuksesLayarPenuh(`BERHASIL!`, pesanFinal);
           } else {
@@ -330,6 +332,7 @@
           }
       })
       .catch(err => {
+          // 4. Jika internet benar-benar putus saat sedang loading, amankan ke Offline
           simpanKeAntrean(dataScan);
           tampilkanSuksesLayarPenuh("TERSIMPAN OFFLINE", "Internet terputus saat memproses.<br>Data diamankan di antrean HP.");
       });
