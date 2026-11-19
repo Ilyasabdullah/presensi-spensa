@@ -320,15 +320,17 @@
       fetch(urlServer, { method: "POST", body: params })
       .then(res => res.text())
       .then(pesanFinal => {
-          if (pesanFinal.includes("Berhasil")) {
-             let splitPesan = pesanFinal.split("|"); let namaSiswa = splitPesan[1] || "Siswa";
+          const teksBersih = pesanFinal.trim();
+          if (teksBersih.startsWith("Berhasil|")) {
+             let splitPesan = teksBersih.split("|");
+             let namaSiswa = splitPesan[1] ? splitPesan[1].trim() : "Siswa";
              tampilkanSuksesLayarPenuh(
                  "SUKSES", 
                  `<span style="font-size:22px; font-weight:bold; display:block; margin: 10px 0; color:#fff; text-transform:uppercase;">${namaSiswa}</span>
                   <span style="font-size:12px; opacity:0.8;">Waktu Scan: ${dataScan.waktu_scan}</span>`
              );
           } else {
-             tampilkanErrorLayarPenuh(`GAGAL MENYIMPAN!<br><span style="font-size:12px;">Pesan Server: ${pesanFinal}</span>`);
+             tampilkanErrorLayarPenuh(`GAGAL MENYIMPAN!<br><span style="font-size:12px;">Pesan Server: ${teksBersih}</span>`);
              delete recentScans[dataScan.id]; localStorage.setItem('recentScansKiosk', JSON.stringify(recentScans));
           }
       })
@@ -356,8 +358,15 @@
             params.append("id", dataScan.id); params.append("lat", dataScan.lat);
             params.append("lng", dataScan.lng); params.append("waktu_scan", dataScan.waktu_scan);
 
-            try { await fetch(urlServer, { method: "POST", body: params }); } 
-            catch (error) { sisaAntrean.push(dataScan); }
+            try {
+                const res = await fetch(urlServer, { method: "POST", body: params });
+                const teks = (await res.text()).trim();
+                if (!teks.startsWith("Berhasil|")) {
+                    sisaAntrean.push(dataScan);
+                }
+            } catch (error) {
+                sisaAntrean.push(dataScan);
+            }
         }
 
         scanQueue = sisaAntrean; localStorage.setItem('absenQueueSmart', JSON.stringify(scanQueue));
